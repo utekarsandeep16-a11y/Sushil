@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Drive — Self Drive Car Rentals</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+<style>
+/* ─── RESET & TOKENS ─────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --orange: #F97316;
+  --orange-d: #EA580C;
+  --orange-g: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
+  --black: #060608;
+  --ink: #0F0F1A;
+  --ink2: #2A2A3E;
+  --white: #FFFFFF;
+  --grey: #8B8BA0;
+  --glass: rgba(255,255,255,0.06);
+  --glass-border: rgba(255,255,255,0.12);
+
+  --f-display: 'Bebas Neue', cursive;
+  --f-ui: 'Rajdhani', sans-serif;
+  --f-body: 'Inter', sans-serif;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--f-body);
+  background: var(--black);
+  color: var(--white);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── SCROLLBAR ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--black); }
+::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 2px; }
+
+/* ─── NAVBAR ─────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 48px;
+  transition: background 0.4s ease, padding 0.4s ease;
+}
+nav.scrolled {
+  background: rgba(6,6,8,0.92);
+  backdrop-filter: blur(20px);
+  padding: 14px 48px;
+  border-bottom: 1px solid rgba(249,115,22,0.15);
+}
+.logo {
+  font-family: var(--f-display);
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  color: var(--white);
+}
+.logo span { color: var(--orange); }
+.nav-links {
+  display: flex; gap: 36px; list-style: none;
+}
+.nav-links a {
+  font-family: var(--f-ui);
+  font-size: 15px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  transition: color 0.3s;
+  position: relative;
+}
+.nav-links a::after {
+  content: '';
+  position: absolute; bottom: -4px; left: 0;
+  width: 0; height: 2px;
+  background: var(--orange);
+  transition: width 0.3s;
+}
+.nav-links a:hover { color: var(--white); }
+.nav-links a:hover::after { width: 100%; }
+.nav-cta {
+  font-family: var(--f-ui);
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 10px 24px;
+  background: var(--orange-g);
+  color: var(--white);
+  border-radius: 4px;
+  text-decoration: none;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.nav-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* ─── JOURNEY TRACK ──────────────────────────────────── */
+/* The animated car sits in a fixed track layer */
+#journey-layer {
+  position: fixed;
+  bottom: 80px;
+  left: 0; right: 0;
+  height: 100px;
+  z-index: 500;
+  pointer-events: none;
+}
+
+/* Road track line */
+#road-track {
+  position: absolute;
+  bottom: 32px; left: 0; right: 0;
+  height: 2px;
+  overflow: visible;
+}
+#road-track svg {
+  width: 100%; height: 60px;
+  overflow: visible;
+}
+
+/* Journey progress bar */
+#progress-bar-wrap {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  z-index: 600;
+}
+#progress-bar {
+  height: 100%;
+  background: var(--orange-g);
+  width: 0%;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 12px rgba(249,115,22,0.6);
+}
+
+/* Car element */
+#scroll-car {
+  position: absolute;
+  bottom: 36px;
+  left: -120px; /* starts off-screen */
+  width: 110px;
+  height: auto;
+  will-change: transform;
+  filter: drop-shadow(0 8px 24px rgba(249,115,22,0.3));
+}
+
+/* Destination dots */
+.dest-dot {
+  position: fixed;
+  bottom: 60px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  border: 2px solid rgba(255,255,255,0.3);
+  z-index: 490;
+  transition: background 0.4s, transform 0.4s, border-color 0.4s;
+}
+.dest-dot.reached {
+  background: var(--orange);
+  border-color: var(--orange);
+  transform: scale(1.4);
+  box-shadow: 0 0 12px rgba(249,115,22,0.6);
+}
+.dest-dot-label {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--f-ui);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+  transition: color 0.4s;
+}
+.dest-dot.reached .dest-dot-label { color: var(--orange); }
+
+/* Speed indicator */
+#speedometer {
+  position: fixed;
+  right: 32px; bottom: 24px;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--f-ui);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.5);
+}
+#speedometer .speed-val {
+  font-family: var(--f-display);
+  font-size: 22px;
+  color: var(--orange);
+  min-width: 40px;
+}
+
+/* ─── SECTIONS ───────────────────────────────────────── */
+section { position: relative; min-height: 100vh; }
+
+/* ─── HERO SECTION ───────────────────────────────────── */
+#hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Video BG */
+#hero-video-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+#hero-video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.hero-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(6,6,8,0.5) 0%,
+    rgba(6,6,8,0.3) 40%,
+    rgba(6,6,8,0.6) 80%,
+    rgba(6,6,8,0.9) 100%
+  );
+}
+
+/* Animated grid overlay */
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(249,115,22,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249,115,22,0.04) 1px, transparent 1px);
+  background-size: 80px 80px;
+  animation: gridMove 20s linear infinite;
+  opacity: 0.6;
+}
+@keyframes gridMove {
+  from { background-position: 0 0; }
+  to { background-position: 80px 80px; }
+}
+
+.hero-content {
+  position: relative; z-index: 2;
+  text-align: center;
+  padding: 0 24px;
+  max-width: 900px;
+}
+
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--f-ui);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease-out) 0.3s forwards;
+}
+.hero-eyebrow::before, .hero-eyebrow::after {
+  content: '';
+  width: 30px; height: 1px;
+  background: var(--orange);
+}
+
+.hero-title {
+  font-family: var(--f-display);
+  font-size: clamp(64px, 10vw, 140px);
+  line-height: 0.92;
+  letter-spacing: 0.02em;
+  color: var(--white);
+  text-transform: uppercase;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease-out) 0.5s forwards;
+}
+.hero-title .accent { color: var(--orange); }
+.hero-title .outline {
+  -webkit-text-stroke: 2px rgba(255,255,255,0.4);
+  color: transparent;
+}
+
+.hero-sub {
+  font-family: var(--f-body);
+  font-size: 17px; font-weight: 300;
+  color: rgba(255,255,255,0.7);
+  max-width: 500px; margin: 24px auto 40px;
+  line-height: 1.7;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease-out) 0.7s forwards;
+}
+
+.hero-btns {
+  display: flex; gap: 16px; justify-content: center;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease-out) 0.9s forwards;
+}
+
+.btn {
+  font-family: var(--f-ui);
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 14px 32px;
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+  cursor: pointer;
+  border: none;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn-primary {
+  background: var(--orange-g);
+  color: var(--white);
+  box-shadow: 0 8px 32px rgba(249,115,22,0.4);
+}
+.btn-primary:hover { box-shadow: 0 12px 40px rgba(249,115,22,0.6); }
+.btn-ghost {
+  background: transparent;
+  color: var(--white);
+  border: 1px solid rgba(255,255,255,0.25);
+  backdrop-filter: blur(8px);
+}
+.btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
+
+/* scroll hint */
+.scroll-hint {
+  position: absolute; bottom: 120px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  font-family: var(--f-ui);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+  opacity: 0;
+  animation: fadeUp 1s var(--ease-out) 1.3s forwards;
+}
+.scroll-hint-line {
+  width: 1px; height: 40px;
+  background: linear-gradient(to bottom, var(--orange), transparent);
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+@keyframes scrollPulse {
+  0%, 100% { transform: scaleY(1); opacity: 1; }
+  50% { transform: scaleY(0.6); opacity: 0.4; }
+}
+
+/* ─── ABOUT SECTION ──────────────────────────────────── */
+#about {
+  background: rgba(6,6,8,0.2);
+  display: flex; align-items: center;
+  padding: 120px 0 160px;
+}
+#about .container {
+  max-width: 1200px; margin: 0 auto; padding: 0 48px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 80px;
+  align-items: center;
+}
+.about-visual {
+  position: relative;
+}
+.about-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 40px;
+  backdrop-filter: blur(20px);
+  position: relative;
+  overflow: hidden;
+}
+.about-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--orange-g);
+}
+.about-stat-big {
+  font-family: var(--f-display);
+  font-size: 100px;
+  line-height: 1;
+  color: var(--orange);
+  opacity: 0.15;
+  position: absolute;
+  top: 20px; right: 20px;
+}
+.about-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  margin-top: 24px;
+}
+.about-stat {
+  text-align: center; padding: 20px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+}
+.about-stat strong {
+  display: block;
+  font-family: var(--f-display);
+  font-size: 42px;
+  color: var(--orange);
+  line-height: 1;
+}
+.about-stat span {
+  font-family: var(--f-ui);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  display: block;
+  margin-top: 6px;
+}
+.about-text {}
+.section-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--f-ui);
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 16px;
+}
+.section-tag::before {
+  content: '';
+  width: 24px; height: 2px;
+  background: var(--orange);
+}
+.section-title {
+  font-family: var(--f-display);
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 20px;
+}
+.section-title em {
+  font-style: normal;
+  color: var(--orange);
+}
+.section-body {
+  font-size: 16px; font-weight: 300;
+  color: rgba(255,255,255,0.65);
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+
+/* Features list */
+.feat-list {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.feat-list li {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--f-ui);
+  font-size: 15px; font-weight: 600;
+  color: rgba(255,255,255,0.85);
+}
+.feat-list li::before {
+  content: '';
+  width: 8px; height: 8px; flex-shrink: 0;
+  background: var(--orange);
+  border-radius: 50%;
+}
+
+/* ─── FLEET SECTION ──────────────────────────────────── */
+#fleet {
+  background: linear-gradient(to bottom, rgba(6,6,8,0.2), rgba(10,10,20,0.5));
+  padding: 120px 0 160px;
+}
+#fleet .container {
+  max-width: 1200px; margin: 0 auto; padding: 0 48px;
+}
+.fleet-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+.fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.fleet-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.4s var(--ease-out), border-color 0.4s;
+  cursor: pointer;
+}
+.fleet-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(249,115,22,0.4);
+}
+.fleet-card-img {
+  width: 100%; aspect-ratio: 16/9;
+  background: linear-gradient(135deg, #1a1a2e, #0d0d1a);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 64px;
+  position: relative;
+  overflow: hidden;
+}
+.fleet-card-img::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.5));
+}
+.fleet-card-body {
+  padding: 24px;
+}
+.fleet-card-name {
+  font-family: var(--f-display);
+  font-size: 24px;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.fleet-card-meta {
+  display: flex; gap: 16px;
+  font-family: var(--f-ui);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 16px;
+}
+.fleet-card-price {
+  display: flex; align-items: baseline; gap: 4px;
+}
+.fleet-card-price strong {
+  font-family: var(--f-display);
+  font-size: 32px;
+  color: var(--orange);
+}
+.fleet-card-price span {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+}
+.fleet-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-family: var(--f-ui);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  background: rgba(249,115,22,0.15);
+  color: var(--orange);
+  border: 1px solid rgba(249,115,22,0.25);
+  margin-bottom: 12px;
+}
+
+/* ─── PRICING SECTION ────────────────────────────────── */
+#pricing {
+  background: rgba(8,8,16,0.6);
+  padding: 120px 0 160px;
+}
+#pricing .container {
+  max-width: 1100px; margin: 0 auto; padding: 0 48px;
+}
+.pricing-header {
+  text-align: center; margin-bottom: 60px;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.pricing-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 40px 32px;
+  position: relative;
+  transition: transform 0.4s var(--ease-out);
+}
+.pricing-card.featured {
+  background: linear-gradient(135deg, rgba(249,115,22,0.12) 0%, rgba(234,88,12,0.08) 100%);
+  border-color: rgba(249,115,22,0.35);
+  transform: scale(1.04);
+}
+.pricing-card.featured:hover { transform: scale(1.04) translateY(-4px); }
+.pricing-card:not(.featured):hover { transform: translateY(-6px); }
+.pricing-badge {
+  position: absolute;
+  top: -12px; left: 50%; transform: translateX(-50%);
+  padding: 4px 16px;
+  background: var(--orange-g);
+  border-radius: 99px;
+  font-family: var(--f-ui);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.pricing-plan {
+  font-family: var(--f-ui);
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 16px;
+}
+.pricing-price {
+  font-family: var(--f-display);
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.pricing-price sup {
+  font-size: 24px; vertical-align: top; margin-top: 10px;
+}
+.pricing-period {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 32px;
+}
+.pricing-features {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 32px;
+}
+.pricing-features li {
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  padding-left: 20px;
+  position: relative;
+}
+.pricing-features li::before {
+  content: '✓';
+  position: absolute; left: 0;
+  color: var(--orange);
+  font-weight: 700;
+}
+
+/* ─── CONTACT SECTION ────────────────────────────────── */
+#contact {
+  background: rgba(6,6,8,0.7);
+  padding: 120px 0 200px;
+}
+#contact .container {
+  max-width: 1100px; margin: 0 auto; padding: 0 48px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 80px;
+  align-items: start;
+}
+.contact-info .section-title { margin-bottom: 24px; }
+.contact-detail {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.contact-detail-icon {
+  width: 40px; height: 40px; flex-shrink: 0;
+  border-radius: 8px;
+  background: rgba(249,115,22,0.12);
+  border: 1px solid rgba(249,115,22,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.contact-detail-label {
+  font-family: var(--f-ui);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 4px;
+}
+.contact-detail-val {
+  font-size: 16px;
+  color: var(--white);
+}
+.contact-form {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 40px;
+}
+.form-group { margin-bottom: 20px; }
+.form-label {
+  display: block;
+  font-family: var(--f-ui);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 8px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: var(--white);
+  font-family: var(--f-body);
+  font-size: 14px;
+  transition: border-color 0.3s;
+  outline: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--orange);
+}
+.form-textarea { resize: vertical; min-height: 100px; }
+.form-select option { background: #1a1a2e; }
+
+/* ─── SCROLL REVEAL ──────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+}
+.reveal.vis {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal.d1 { transition-delay: 0.1s; }
+.reveal.d2 { transition-delay: 0.2s; }
+.reveal.d3 { transition-delay: 0.3s; }
+.reveal.d4 { transition-delay: 0.4s; }
+
+/* ─── KEYFRAMES ──────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── FOOTER ─────────────────────────────────────────── */
+footer {
+  background: var(--black);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 32px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+footer .logo { font-size: 20px; }
+footer p {
+  font-size: 13px;
+  color: rgba(255,255,255,0.3);
+}
+
+/* ─── MOBILE ─────────────────────────────────────────── */
+@media (max-width: 900px) {
+  nav { padding: 16px 24px; }
+  .nav-links { display: none; }
+  #about .container,
+  #contact .container { grid-template-columns: 1fr; }
+  .fleet-grid, .pricing-grid { grid-template-columns: 1fr; }
+  .pricing-card.featured { transform: none; }
+  .dest-dot, .dest-dot-label { display: none; }
+  #speedometer { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── NAVBAR ──────────────────────────────────────── -->
+<nav id="main-nav">
+  <div class="logo">SG<span>DRIVE</span></div>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#fleet">Fleet</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <a href="#contact" class="nav-cta">Book Now →</a>
+</nav>
+
+<!-- ─── JOURNEY LAYER (fixed, scroll-driven car) ─────── -->
+<div id="journey-layer" aria-hidden="true">
+  <!-- Road dashes -->
+  <div id="road-track">
+    <svg viewBox="0 0 1400 40" preserveAspectRatio="none">
+      <!-- Ground line -->
+      <line x1="0" y1="36" x2="1400" y2="36" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <!-- Dashed center line -->
+      <line x1="0" y1="36" x2="1400" y2="36"
+        stroke="rgba(249,115,22,0.3)"
+        stroke-width="1.5"
+        stroke-dasharray="30,20"
+        class="road-dash"/>
+    </svg>
+  </div>
+
+  <!-- White car SVG -->
+  <svg id="scroll-car" viewBox="0 0 220 80" xmlns="http://www.w3.org/2000/svg">
+    <!-- Shadow -->
+    <ellipse cx="110" cy="76" rx="75" ry="6" fill="rgba(0,0,0,0.3)"/>
+    <!-- Body -->
+    <rect x="10" y="38" width="200" height="30" rx="4" fill="#FFFFFF"/>
+    <!-- Cabin roof -->
+    <path d="M60,38 Q70,10 90,8 L150,8 Q170,10 175,38 Z" fill="#F0F0F2"/>
+    <!-- Windshield -->
+    <path d="M68,37 Q72,14 92,12 L130,12 Q148,14 158,37 Z" fill="rgba(120,180,255,0.6)" stroke="rgba(200,200,200,0.3)" stroke-width="0.5"/>
+    <!-- Hood highlight -->
+    <path d="M175,38 Q185,38 200,40 L200,52 Q185,48 175,48 Z" fill="rgba(255,255,255,0.5)"/>
+    <!-- Side windows -->
+    <path d="M68,37 L80,14 L92,12 L92,37 Z" fill="rgba(100,160,240,0.5)" stroke="rgba(200,200,200,0.2)" stroke-width="0.5"/>
+    <path d="M148,37 L138,14 L150,12 L168,37 Z" fill="rgba(100,160,240,0.5)" stroke="rgba(200,200,200,0.2)" stroke-width="0.5"/>
+    <!-- Door line -->
+    <line x1="110" y1="38" x2="110" y2="68" stroke="rgba(180,180,180,0.4)" stroke-width="0.8"/>
+    <line x1="145" y1="38" x2="145" y2="68" stroke="rgba(180,180,180,0.4)" stroke-width="0.8"/>
+    <!-- Body lines -->
+    <line x1="12" y1="53" x2="208" y2="53" stroke="rgba(180,180,180,0.2)" stroke-width="0.5"/>
+    <!-- Front bumper/grill -->
+    <rect x="200" y="42" width="8" height="18" rx="2" fill="#E0E0E2"/>
+    <rect x="203" y="46" width="4" height="3" rx="1" fill="rgba(249,115,22,0.8)"/>
+    <rect x="203" y="51" width="4" height="3" rx="1" fill="rgba(249,115,22,0.6)"/>
+    <!-- Headlights -->
+    <rect x="198" y="40" width="12" height="6" rx="2" fill="#FFFDE0"/>
+    <rect x="198" y="40" width="12" height="6" rx="2" fill="rgba(255,240,150,0.5)" style="filter:blur(2px)"/>
+    <!-- Taillights -->
+    <rect x="8" y="40" width="10" height="6" rx="2" fill="#FF4444"/>
+    <!-- Front wheel -->
+    <circle cx="168" cy="68" r="14" fill="#2A2A2A"/>
+    <circle cx="168" cy="68" r="9" fill="#3A3A3A"/>
+    <circle cx="168" cy="68" r="5" fill="#555"/>
+    <line x1="163" y1="68" x2="173" y2="68" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <line x1="168" y1="63" x2="168" y2="73" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <!-- Rear wheel -->
+    <circle cx="55" cy="68" r="14" fill="#2A2A2A"/>
+    <circle cx="55" cy="68" r="9" fill="#3A3A3A"/>
+    <circle cx="55" cy="68" r="5" fill="#555"/>
+    <line x1="50" y1="68" x2="60" y2="68" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <line x1="55" y1="63" x2="55" y2="73" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <!-- Orange accent stripe -->
+    <line x1="12" y1="55" x2="196" y2="55" stroke="#F97316" stroke-width="1.5" opacity="0.7"/>
+    <!-- Roof rack detail -->
+    <rect x="95" y="7" width="40" height="3" rx="1.5" fill="rgba(180,180,180,0.4)"/>
+  </svg>
+</div>
+
+<!-- ─── DESTINATION DOTS ───────────────────────────── -->
+<!-- Injected by JS -->
+
+<!-- ─── PROGRESS BAR ──────────────────────────────── -->
+<div id="progress-bar-wrap">
+  <div id="progress-bar"></div>
+</div>
+
+<!-- ─── SPEEDOMETER ───────────────────────────────── -->
+<div id="speedometer">
+  <span>KM/H</span>
+  <span class="speed-val" id="speed-val">0</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  SECTION 1: HERO                                    -->
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="hero" data-section="0">
+  <div id="hero-video-wrap">
+    <video id="hero-video" muted playsinline preload="auto">
+      <source src="White_car_drives_202604142335.mp4" type="video/mp4">
+    </video>
+    <div class="hero-overlay"></div>
+    <div class="hero-grid"></div>
+  </div>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">Self-Drive Car Rentals · Mumbai</div>
+    <h1 class="hero-title">
+      Your Road<br>
+      <span class="outline">Your</span> <span class="accent">Rules</span>
+    </h1>
+    <p class="hero-sub">Drive the car you've always wanted. No driver, no hassle — just you, the open road, and a perfectly maintained car.</p>
+    <div class="hero-btns">
+      <a href="#fleet" class="btn btn-primary">Explore Fleet →</a>
+      <a href="#about" class="btn btn-ghost">How It Works</a>
+    </div>
+  </div>
+
+  <div class="scroll-hint">
+    <div class="scroll-hint-line"></div>
+    <span>Scroll to drive</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  SECTION 2: ABOUT                                   -->
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="about" data-section="1">
+  <div class="container">
+    <div class="about-visual reveal">
+      <div class="about-card">
+        <div class="about-stat-big">∞</div>
+        <div class="section-tag">By The Numbers</div>
+        <h3 style="font-family:var(--f-display);font-size:32px;margin-bottom:16px">5 Years on the Road</h3>
+        <p style="color:rgba(255,255,255,0.6);font-size:15px;line-height:1.7">Mumbai's most trusted self-drive car rental platform. From Colaba to Thane, we've got you covered.</p>
+        <div class="about-stats">
+          <div class="about-stat">
+            <strong>50+</strong>
+            <span>Cars</span>
+          </div>
+          <div class="about-stat">
+            <strong>12k+</strong>
+            <span>Trips</span>
+          </div>
+          <div class="about-stat">
+            <strong>4.9★</strong>
+            <span>Rating</span>
+          </div>
+          <div class="about-stat">
+            <strong>24/7</strong>
+            <span>Support</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="about-text reveal d2">
+      <div class="section-tag">About SG Drive</div>
+      <h2 class="section-title">Drive <em>Freedom</em>,<br>Not a Taxi</h2>
+      <p class="section-body">We believe everyone deserves the freedom of the open road. SG Drive puts you in the driver's seat — no surge pricing, no stranger making conversation, just you and your destination.</p>
+      <ul class="feat-list">
+        <li>Zero-deposit booking for verified users</li>
+        <li>Fully insured with roadside assistance</li>
+        <li>Petrol, Diesel, CNG & Electric options</li>
+        <li>Hourly, daily and weekly rental plans</li>
+        <li>Home delivery available in Mumbai & suburbs</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  SECTION 3: FLEET                                   -->
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="fleet" data-section="2">
+  <div class="container">
+    <div class="fleet-header">
+      <div class="section-tag reveal">Our Fleet</div>
+      <h2 class="section-title reveal d1">Choose Your <em>Ride</em></h2>
+      <p style="color:rgba(255,255,255,0.55);max-width:500px;margin:0 auto;" class="reveal d2">Every car serviced, sanitized, and GPS-tracked. Pick up or get it delivered.</p>
+    </div>
+    <div class="fleet-grid">
+      <div class="fleet-card reveal d1">
+        <div class="fleet-card-img">🚗</div>
+        <div class="fleet-card-body">
+          <div class="fleet-tag">Popular</div>
+          <div class="fleet-card-name">Maruti Swift</div>
+          <div class="fleet-card-meta">
+            <span>Petrol</span>
+            <span>Manual</span>
+            <span>5 Seats</span>
+          </div>
+          <div class="fleet-card-price">
+            <strong>₹999</strong>
+            <span>/day</span>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card reveal d2">
+        <div class="fleet-card-img">🏎️</div>
+        <div class="fleet-card-body">
+          <div class="fleet-tag">Bestseller</div>
+          <div class="fleet-card-name">Honda City</div>
+          <div class="fleet-card-meta">
+            <span>Petrol</span>
+            <span>Automatic</span>
+            <span>5 Seats</span>
+          </div>
+          <div class="fleet-card-price">
+            <strong>₹1,499</strong>
+            <span>/day</span>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card reveal d3">
+        <div class="fleet-card-img">🚙</div>
+        <div class="fleet-card-body">
+          <div class="fleet-tag">Family</div>
+          <div class="fleet-card-name">Toyota Innova</div>
+          <div class="fleet-card-meta">
+            <span>Diesel</span>
+            <span>Manual</span>
+            <span>7 Seats</span>
+          </div>
+          <div class="fleet-card-price">
+            <strong>₹2,499</strong>
+            <span>/day</span>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card reveal d1">
+        <div class="fleet-card-img">⚡</div>
+        <div class="fleet-card-body">
+          <div class="fleet-tag">Electric</div>
+          <div class="fleet-card-name">Tata Nexon EV</div>
+          <div class="fleet-card-meta">
+            <span>Electric</span>
+            <span>Automatic</span>
+            <span>5 Seats</span>
+          </div>
+          <div class="fleet-card-price">
+            <strong>₹1,799</strong>
+            <span>/day</span>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card reveal d2">
+        <div class="fleet-card-img">🛻</div>
+        <div class="fleet-card-body">
+          <div class="fleet-tag">Adventure</div>
+          <div class="fleet-card-name">Mahindra Thar</div>
+          <div class="fleet-card-meta">
+            <span>Diesel</span>
+            <span>Manual 4WD</span>
+            <span>4 Seats</span>
+          </div>
+          <div class="fleet-card-price">
+            <strong>₹3,499</strong>
+            <span>/day</span>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card reveal d3">
+        <div class="fleet-card-img">🏖️</div>
+        <div class="fleet-card-body">
+          <div class="fleet-tag">Premium</div>
+          <div class="fleet-card-name">Hyundai Creta</div>
+          <div class="fleet-card-meta">
+            <span>Petrol</span>
+            <span>Automatic</span>
+            <span>5 Seats</span>
+          </div>
+          <div class="fleet-card-price">
+            <strong>₹1,999</strong>
+            <span>/day</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  SECTION 4: PRICING                                 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="pricing" data-section="3">
+  <div class="container">
+    <div class="pricing-header">
+      <div class="section-tag reveal">Simple Pricing</div>
+      <h2 class="section-title reveal d1">No Hidden <em>Charges</em></h2>
+      <p style="color:rgba(255,255,255,0.55);max-width:480px;margin:0 auto" class="reveal d2">Transparent pricing. What you see is what you pay.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card reveal d1">
+        <div class="pricing-plan">Hourly</div>
+        <div class="pricing-price"><sup>₹</sup>199</div>
+        <div class="pricing-period">per hour · minimum 4 hrs</div>
+        <ul class="pricing-features">
+          <li>Basic insurance included</li>
+          <li>Fuel at own cost</li>
+          <li>100 km limit/day</li>
+          <li>Pickup from our hub</li>
+        </ul>
+        <a href="#contact" class="btn btn-ghost" style="width:100%;justify-content:center">Get Started</a>
+      </div>
+      <div class="pricing-card featured reveal d2">
+        <div class="pricing-badge">Most Popular</div>
+        <div class="pricing-plan">Daily</div>
+        <div class="pricing-price"><sup>₹</sup>999</div>
+        <div class="pricing-period">per day · 24 hrs</div>
+        <ul class="pricing-features">
+          <li>Comprehensive insurance</li>
+          <li>300 km included</li>
+          <li>Home delivery available</li>
+          <li>24/7 roadside assist</li>
+          <li>GPS tracker included</li>
+        </ul>
+        <a href="#contact" class="btn btn-primary" style="width:100%;justify-content:center">Book Now →</a>
+      </div>
+      <div class="pricing-card reveal d3">
+        <div class="pricing-plan">Weekly</div>
+        <div class="pricing-price"><sup>₹</sup>5,499</div>
+        <div class="pricing-period">per week · 7 days</div>
+        <ul class="pricing-features">
+          <li>Full coverage insurance</li>
+          <li>Unlimited km</li>
+          <li>Free home delivery</li>
+          <li>Priority support</li>
+          <li>Fuel discount card</li>
+        </ul>
+        <a href="#contact" class="btn btn-ghost" style="width:100%;justify-content:center">Get Started</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!--  SECTION 5: CONTACT                                 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="contact" data-section="4">
+  <div class="container">
+    <div class="contact-info reveal">
+      <div class="section-tag">Get In Touch</div>
+      <h2 class="section-title">Book Your<br><em>Journey</em></h2>
+      <p class="section-body">Ready to hit the road? Fill in the form and our team will confirm your booking within 2 hours.</p>
+      <div class="contact-detail">
+        <div class="contact-detail-icon">📍</div>
+        <div>
+          <div class="contact-detail-label">Location</div>
+          <div class="contact-detail-val">Thane, Mumbai — Maharashtra</div>
+        </div>
+      </div>
+      <div class="contact-detail">
+        <div class="contact-detail-icon">📞</div>
+        <div>
+          <div class="contact-detail-label">Phone</div>
+          <div class="contact-detail-val">+91 98765 43210</div>
+        </div>
+      </div>
+      <div class="contact-detail">
+        <div class="contact-detail-icon">⏰</div>
+        <div>
+          <div class="contact-detail-label">Hours</div>
+          <div class="contact-detail-val">7 AM – 10 PM · 7 days a week</div>
+        </div>
+      </div>
+    </div>
+    <div class="contact-form reveal d2">
+      <div class="form-group">
+        <label class="form-label">Your Name</label>
+        <input type="text" class="form-input" placeholder="Rajesh Sharma">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" class="form-input" placeholder="+91 98765 43210">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Car Preference</label>
+        <select class="form-select">
+          <option>Select a car type</option>
+          <option>Hatchback (Swift, Wagon R)</option>
+          <option>Sedan (City, Verna)</option>
+          <option>SUV (Creta, Thar)</option>
+          <option>MUV (Innova, Ertiga)</option>
+          <option>Electric (Nexon EV)</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label class="form-label">Start Date</label>
+          <input type="date" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">End Date</label>
+          <input type="date" class="form-input">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Message (optional)</label>
+        <textarea class="form-textarea" placeholder="Any special requirements?"></textarea>
+      </div>
+      <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:16px">
+        Send Booking Request →
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ──────────────────────────────────────── -->
+<footer>
+  <div class="logo">SG<span>DRIVE</span></div>
+  <p>© 2025 SG Drive · Thane, Mumbai · All rights reserved</p>
+  <p style="color:rgba(255,255,255,0.2);font-size:12px">Drive responsibly.</p>
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   SG DRIVE — SCROLL JOURNEY ENGINE
+   Car travels left→right as user scrolls through sections
+   ═══════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* ─── CONFIG ─────────────────────────────────────────── */
+  const SECTIONS = [
+    { id: 'hero',    label: 'Start' },
+    { id: 'about',   label: 'About' },
+    { id: 'fleet',   label: 'Fleet' },
+    { id: 'pricing', label: 'Pricing' },
+    { id: 'contact', label: 'Finish' },
+  ];
+  const SECTION_COUNT = SECTIONS.length;
+  const VW = () => window.innerWidth;
+
+  /* ─── DESTINATION DOTS ───────────────────────────────── */
+  const dotPositions = SECTIONS.map((_, i) => {
+    // evenly distributed across viewport, 8% from each edge
+    return 8 + (i / (SECTION_COUNT - 1)) * 84; // % of VW
+  });
+
+  const dotsWrap = document.body;
+  const dotEls = SECTIONS.map((sec, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'dest-dot';
+    dot.style.left = dotPositions[i] + 'vw';
+
+    const label = document.createElement('span');
+    label.className = 'dest-dot-label';
+    label.textContent = sec.label;
+    dot.appendChild(label);
+
+    dotsWrap.appendChild(dot);
+    return dot;
+  });
+
+  /* ─── CAR ELEMENT ────────────────────────────────────── */
+  const car = document.getElementById('scroll-car');
+  const progressBar = document.getElementById('progress-bar');
+  const speedVal = document.getElementById('speed-val');
+
+  /* Car starts off the left edge */
+  gsap.set(car, { x: -150, y: 0, rotation: 0 });
+
+  /* ─── CALCULATE SECTION Y POSITIONS ─────────────────── */
+  function getSectionPositions() {
+    const sections = document.querySelectorAll('section[data-section]');
+    const docH = document.documentElement.scrollHeight - window.innerHeight;
+    return Array.from(sections).map(s => s.offsetTop / docH);
+  }
+
+  /* ─── MAIN SCROLL ANIMATION ──────────────────────────── */
+  let lastProgress = 0;
+  let speedTimeout;
+  let currentSection = -1;
+
+  function onScroll() {
+    const scrolled = window.scrollY;
+    const docH = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = Math.min(Math.max(scrolled / docH, 0), 1);
+
+    /* Progress bar */
+    progressBar.style.width = (progress * 100) + '%';
+
+    /* Car X position: from -10% of VW to 95% of VW */
+    const startX = -130;
+    const endX   = VW() - 60; // near right edge
+    const carX   = startX + progress * (endX - startX);
+
+    /* Slight suspension bounce based on scroll speed */
+    const delta = progress - lastProgress;
+    const bounceY = delta > 0 ? Math.min(delta * 600, 5) : 0; // dips forward slightly
+    const tilt = delta * 2000; // slight rotation
+
+    gsap.to(car, {
+      x: carX,
+      y: bounceY,
+      rotation: Math.max(Math.min(tilt, 3), -3),
+      duration: 0.3,
+      ease: 'power2.out',
+      overwrite: 'auto'
+    });
+
+    /* Speedometer */
+    const speed = Math.round(Math.abs(delta) * 8000);
+    const displaySpeed = Math.min(speed, 120);
+    speedVal.textContent = displaySpeed;
+    clearTimeout(speedTimeout);
+    speedTimeout = setTimeout(() => {
+      gsap.to(speedVal, { textContent: 0, duration: 0.5, snap: { textContent: 1 } });
+    }, 300);
+
+    /* Determine which section car is "at" */
+    const positions = getSectionPositions();
+    let active = 0;
+    for (let i = 0; i < positions.length; i++) {
+      if (progress >= positions[i] - 0.05) active = i;
+    }
+
+    if (active !== currentSection) {
+      currentSection = active;
+      dotEls.forEach((d, i) => d.classList.toggle('reached', i <= active));
+    }
+
+    lastProgress = progress;
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll(); // init
+
+  /* ─── WHEEL SPIN ANIMATION ───────────────────────────── */
+  // The wheel circles inside the car SVG
+  function animateWheels() {
+    const circles = car.querySelectorAll('circle');
+    // Not spinning individual SVG elements directly; handled by scroll visual
+    requestAnimationFrame(animateWheels);
+  }
+
+  /* ─── PARALLAX ON HERO ───────────────────────────────── */
+  const heroGrid = document.querySelector('.hero-grid');
+  if (heroGrid) {
+    gsap.to(heroGrid, {
+      y: '30%',
+      ease: 'none',
+      scrollTrigger: {
+        trigger: '#hero',
+        start: 'top top',
+        end: 'bottom top',
+        scrub: true,
+      }
+    });
+  }
+
+  /* Slight parallax on the video */
+  const heroVideo = document.getElementById('hero-video');
+  if (heroVideo) {
+    heroVideo.pause();
+    
+    ScrollTrigger.create({
+      trigger: document.body,
+      start: 'top top',
+      end: 'bottom bottom',
+      scrub: 1,
+      onUpdate: (self) => {
+        if (heroVideo.duration) {
+          heroVideo.currentTime = self.progress * heroVideo.duration;
+        }
+      }
+    });
+  }
+
+  /* ─── SECTION CONTENT REVEAL ─────────────────────────── */
+  const revealEls = document.querySelectorAll('.reveal');
+  if (revealEls.length) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('vis');
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach(el => obs.observe(el));
+  }
+
+  /* ─── SECTION TITLES ANIMATE ON ARRIVAL ──────────────── */
+  document.querySelectorAll('section[data-section]:not(#hero)').forEach(sec => {
+    const title = sec.querySelector('.section-title');
+    if (!title) return;
+    gsap.from(title, {
+      xPercent: -5,
+      opacity: 0,
+      duration: 0.9,
+      ease: 'power3.out',
+      scrollTrigger: {
+        trigger: sec,
+        start: 'top 70%',
+        toggleActions: 'play none none none',
+      }
+    });
+  });
+
+  /* ─── NAVBAR SCROLL ──────────────────────────────────── */
+  const nav = document.getElementById('main-nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+  }, { passive: true });
+
+  /* ─── ROAD DASH ANIMATION ────────────────────────────── */
+  const roadDash = document.querySelector('.road-dash');
+  if (roadDash) {
+    gsap.to(roadDash, {
+      strokeDashoffset: -500,
+      ease: 'none',
+      repeat: -1,
+      duration: 3,
+    });
+  }
+
+  /* ─── CAR HEADLIGHT GLOW PULSE ───────────────────────── */
+  const headlightRect = car.querySelectorAll('rect');
+  // subtle glow pulse on the car while moving
+  gsap.to(car, {
+    filter: 'drop-shadow(0 8px 30px rgba(249,115,22,0.5)) drop-shadow(0 0 60px rgba(255,255,200,0.15))',
+    duration: 1.5,
+    ease: 'sine.inOut',
+    yoyo: true,
+    repeat: -1,
+  });
+
+  /* ─── INITIAL CAR ENTRANCE ───────────────────────────── */
+  // After a short delay, car drives in from left
+  setTimeout(() => {
+    gsap.fromTo(car,
+      { x: -160, opacity: 0 },
+      { x: -130, opacity: 1, duration: 1.2, ease: 'power3.out' }
+    );
+  }, 1200);
+
+  /* ─── RESIZE HANDLER ─────────────────────────────────── */
+  window.addEventListener('resize', () => {
+    onScroll();
+    dotEls.forEach((dot, i) => {
+      dot.style.left = dotPositions[i] + 'vw';
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
